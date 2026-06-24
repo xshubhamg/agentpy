@@ -5,13 +5,16 @@ from typing import Annotated
 from rich.console import Console
 
 from .agent import Agent
+from .client import LLMClient
+from .plugins import register_all
 
 
 def main() -> None:
     """CLI entry point for the AgentPy assistant."""
     console = Console()
+    client = LLMClient(model="gemma4:e2b")
     agent = Agent(
-        model="gemma4:e2b", 
+        client=client, 
         system_prompt="Be a very good personal AI assistant"
     )
 
@@ -23,32 +26,18 @@ def main() -> None:
             f"Current user: {getpass.getuser()}\n"
         )
 
-    @agent.tool
-    def add(
-        a: Annotated[int, "First number"], b: Annotated[int, "Second number"]
-    ) -> dict[str, int]:
-        """Add two numbers together"""
-        return {"result": a + b}
+    # Register all builtin tools via the plugin system
+    register_all(agent)
 
-    @agent.tool
-    def multiply(
-        a: Annotated[int, "First number"], b: Annotated[int, "Second number"]
-    ) -> dict[str, int]:
-        """Multiply two numbers together"""
-        return {"result": a * b}
+    def print_header():
+        console.print("[bold blue]AgentPy CLI[/bold blue]")
+        console.print("[dim]Type '/exit' or 'quit' to stop. Type '/clear' to reset chat history and clear screen.[/dim]\n")
 
-    @agent.tool
-    def secret() -> dict[str, str]:
-        """Return secret key"""
-        return {"result": "fluffy bunnies"}
-
-    console.print("[bold blue]AgentPy CLI[/bold blue]")
-    console.print("[dim]Type '/exit' or 'quit' to stop. Type '/clear' to reset chat history.[/dim]\n")
+    print_header()
 
     while True:
         try:
-            console.print("[green]You: [/green]", end="")
-            user_input = console.input().strip()
+            user_input = console.input("[green]You: [/green]").strip()
 
             if not user_input:
                 continue
@@ -59,7 +48,9 @@ def main() -> None:
 
             if user_input.lower() == "/clear":
                 agent.messages = []
-                console.print("[yellow]Chat history cleared.[/yellow]")
+                console.clear()
+                print_header()
+                console.print("[yellow]Chat history cleared and screen reset.[/yellow]")
                 continue
 
             console.print("[blue]Assistant: [/blue]", end="")
@@ -97,6 +88,8 @@ def main() -> None:
                         elif event["type"] == "tool_call":
                             # Use a separate print or a special line in live for tool calls
                             live.console.print(f"[dim]Calling tool: {event['name']}...[/dim]")
+                        elif event["type"] == "status":
+                            live.console.print(f"[dim]{event['message']}[/dim]")
                 except StopIteration:
                     pass
 

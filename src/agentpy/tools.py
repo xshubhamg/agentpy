@@ -118,7 +118,14 @@ class Tools:
         if not fn:
             return {"error": f"Tool '{fn_name}' not found"}
         try:
-            args = json.loads(fn_payload.get("arguments") or "{}")
+            raw_args = fn_payload.get("arguments") or "{}"
+            if isinstance(raw_args, str):
+                args = json.loads(raw_args)
+            elif isinstance(raw_args, dict):
+                args = raw_args
+            else:
+                return {"error": f"Invalid arguments type: {type(raw_args)}"}
+            
             result = fn(**args)
             return result if isinstance(result, dict) else {"result": result}
         except KeyboardInterrupt:
